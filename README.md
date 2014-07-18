@@ -43,17 +43,14 @@ Usage of varcheck:
   -e=false: Report exported variables and constants
 
 $ varcheck image/jpeg
-unzig
-quantIndexLuminance
-quantIndexChrominance
-huffIndexChrominanceDC
-dcTable
-maxV
-maxH
-acTable
-huffIndexLuminanceAC
-huffIndexChrominanceAC
 huffIndexLuminanceDC
+huffIndexChrominanceDC
+huffIndexLuminanceAC
+maxV
+huffIndexChrominanceAC
+quantIndexLuminance
+maxH
+quantIndexChrominance
 ```
 
 ## Known limitations

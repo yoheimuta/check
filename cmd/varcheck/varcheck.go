@@ -4,8 +4,11 @@ import (
 	"flag"
 	"fmt"
 	"go/ast"
+	"log"
 	"os"
 
+	_ "code.google.com/p/go.tools/go/gcimporter"
+	"code.google.com/p/go.tools/go/types"
 	"github.com/opennota/check"
 )
 
@@ -14,17 +17,19 @@ var (
 )
 
 type visitor struct {
-	m          map[*ast.Object]int
+	pkg        *types.Package
+	info       types.Info
+	m          map[types.Object]int
 	insideFunc bool
 }
 
-func (v *visitor) decl(obj *ast.Object) {
+func (v *visitor) decl(obj types.Object) {
 	if _, ok := v.m[obj]; !ok {
 		v.m[obj] = 0
 	}
 }
 
-func (v *visitor) use(obj *ast.Object) {
+func (v *visitor) use(obj types.Object) {
 	if _, ok := v.m[obj]; ok {
 		v.m[obj]++
 	} else {
@@ -35,13 +40,13 @@ func (v *visitor) use(obj *ast.Object) {
 func (v *visitor) Visit(node ast.Node) ast.Visitor {
 	switch node := node.(type) {
 	case *ast.Ident:
-		v.use(node.Obj)
+		v.use(v.info.Uses[node])
 
 	case *ast.ValueSpec:
 		if !v.insideFunc {
 			for _, ident := range node.Names {
 				if ident.Name != "_" {
-					v.decl(ident.Obj)
+					v.decl(v.info.Defs[ident])
 				}
 			}
 		}
@@ -69,15 +74,28 @@ func main() {
 	if len(flag.Args()) > 0 {
 		pkgPath = flag.Arg(0)
 	}
-	visitor := &visitor{m: make(map[*ast.Object]int)}
-	_, astFiles := check.ASTFilesForPackage(pkgPath)
+	visitor := &visitor{
+		info: types.Info{
+			Defs: make(map[*ast.Ident]types.Object),
+			Uses: make(map[*ast.Ident]types.Object),
+		},
+
+		m: make(map[types.Object]int),
+	}
+	fset, astFiles := check.ASTFilesForPackage(pkgPath)
+	config := types.Config{}
+	var err error
+	visitor.pkg, err = config.Check(pkgPath, fset, astFiles, &visitor.info)
+	if err != nil {
+		log.Fatal(err)
+	}
 	for _, f := range astFiles {
 		ast.Walk(visitor, f)
 	}
 	exitStatus := 0
 	for obj, useCount := range visitor.m {
-		if useCount == 0 && (*reportExported || !check.IsExported(obj.Name)) {
-			fmt.Println(obj.Name)
+		if useCount == 0 && (*reportExported || !check.IsExported(obj.Name())) {
+			fmt.Println(obj.Name())
 			exitStatus = 1
 		}
 	}
