@@ -59,5 +59,5 @@ structcheck doesn't handle embedded structs yet.
 
 ## License
 
-GNU LGPL v3+
+GNU GPL v3+
 
