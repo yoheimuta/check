@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 
-	_ "code.google.com/p/go.tools/go/gcimporter"
 	"code.google.com/p/go.tools/go/types"
 	"honnef.co/go/importer"
 
