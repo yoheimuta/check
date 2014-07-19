@@ -9,6 +9,8 @@ import (
 
 	_ "code.google.com/p/go.tools/go/gcimporter"
 	"code.google.com/p/go.tools/go/types"
+	"honnef.co/go/importer"
+
 	"github.com/opennota/check"
 )
 
@@ -136,7 +138,8 @@ func main() {
 		m: make(map[string]map[string]int),
 	}
 	fset, astFiles := check.ASTFilesForPackage(pkgPath)
-	config := types.Config{}
+	imp := importer.New()
+	config := types.Config{Import: imp.Import}
 	var err error
 	visitor.pkg, err = config.Check(pkgPath, fset, astFiles, &visitor.info)
 	if err != nil {
