@@ -55,7 +55,7 @@ quantIndexChrominance
 
 ## Known limitations
 
-structcheck doesn't handle embedded structs yet.
+structcheck doesn't handle embedded structs yet and ignores struct literals with positional values.
 
 ## License
 
