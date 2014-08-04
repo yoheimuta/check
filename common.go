@@ -10,10 +10,6 @@ import (
 	"reflect"
 )
 
-func IsExported(ident string) bool {
-	return ident[0] >= 'A' && ident[0] <= 'Z'
-}
-
 func ASTFilesForPackage(path string) (*token.FileSet, []*ast.File) {
 	ctx := build.Default
 	pkg, err := ctx.Import(path, ".", 0)

@@ -96,7 +96,7 @@ func main() {
 	}
 	exitStatus := 0
 	for obj, useCount := range visitor.m {
-		if useCount == 0 && (*reportExported || !check.IsExported(obj.Name())) {
+		if useCount == 0 && (*reportExported || !ast.IsExported(obj.Name())) {
 			pos := fset.Position(obj.Pos())
 			fmt.Printf("%s:%d: %s\n", pos.Filename, pos.Line, obj.Name())
 			exitStatus = 1
