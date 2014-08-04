@@ -4,12 +4,14 @@ import (
 	"flag"
 	"fmt"
 	"go/ast"
+	"go/token"
 	"os"
 
 	"github.com/opennota/check"
 )
 
 type visitor struct {
+	fset     *token.FileSet
 	m        map[*ast.Object][]string
 	funcName string
 }
@@ -31,7 +33,9 @@ func (v *visitor) Visit(node ast.Node) ast.Visitor {
 					found := false
 					for _, selname := range selectors {
 						if selname == sel.Sel.Name {
-							fmt.Printf("Repeating defer %s.%s() inside function %s\n",
+							pos := v.fset.Position(node.Pos())
+							fmt.Printf("%s:%d: Repeating defer %s.%s() inside function %s\n",
+								pos.Filename, pos.Line,
 								ident.Name, selname, v.funcName)
 							found = true
 							exitStatus = 1
@@ -55,7 +59,8 @@ func main() {
 		pkgPath = flag.Arg(0)
 	}
 	visitor := &visitor{}
-	_, astFiles := check.ASTFilesForPackage(pkgPath)
+	fset, astFiles := check.ASTFilesForPackage(pkgPath)
+	visitor.fset = fset
 	for _, f := range astFiles {
 		ast.Walk(visitor, f)
 	}
