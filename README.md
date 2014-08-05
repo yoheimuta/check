@@ -15,7 +15,7 @@ Find repeating `defer`s.
 
 ```
 $ defercheck go/parser
-Repeating defer p.closeScope() inside function parseSwitchStmt
+/usr/.../go/parser/parser.go:1929: Repeating defer p.closeScope() inside function parseSwitchStmt
 ```
 
 Find unused struct fields.
@@ -27,12 +27,12 @@ Usage of structcheck:
     -n=1: Minimum use count
 
 $ structcheck fmt
-pp.n
-ssave.argLimit
-ssave.limit
-ssave.maxWid
-ssave.nlIsEnd
-ssave.nlIsSpace
+/usr/.../fmt/print.go:110: pp.n
+/usr/.../fmt/scan.go:173: ssave.nlIsEnd
+/usr/.../fmt/scan.go:174: ssave.nlIsSpace
+/usr/.../fmt/scan.go:175: ssave.argLimit
+/usr/.../fmt/scan.go:176: ssave.limit
+/usr/.../fmt/scan.go:177: ssave.maxWid
 ```
 
 Find unused global variables and constants.
@@ -43,19 +43,19 @@ Usage of varcheck:
   -e=false: Report exported variables and constants
 
 $ varcheck image/jpeg
-huffIndexLuminanceDC
-huffIndexChrominanceDC
-huffIndexLuminanceAC
-maxV
-huffIndexChrominanceAC
-quantIndexLuminance
-maxH
-quantIndexChrominance
+/usr/.../image/jpeg/writer.go:55: quantIndexChrominance
+/usr/.../image/jpeg/writer.go:94: huffIndexChrominanceAC
+/usr/.../image/jpeg/reader.go:53: maxH
+/usr/.../image/jpeg/writer.go:92: huffIndexLuminanceAC
+/usr/.../image/jpeg/writer.go:91: huffIndexLuminanceDC
+/usr/.../image/jpeg/reader.go:54: maxV
+/usr/.../image/jpeg/writer.go:93: huffIndexChrominanceDC
+/usr/.../image/jpeg/writer.go:54: quantIndexLuminance
 ```
 
 ## Known limitations
 
-structcheck doesn't handle embedded structs yet and ignores struct literals with positional values.
+structcheck doesn't handle embedded structs yet.
 
 ## License
 

@@ -15,57 +15,57 @@ import (
 
 var (
 	assignmentsOnly = flag.Bool("a", false, "Count assignments only")
-	minimumUseCount = flag.Int("n", 1, "Minimum use count")
 )
 
 type visitor struct {
 	pkg  *types.Package
 	info types.Info
-	m    map[string]map[string]int
+	m    map[types.Type]map[string]int
+	skip map[types.Type]struct{}
 }
 
-func (v *visitor) decl(structName, fieldName string) {
-	if _, ok := v.m[structName]; !ok {
-		v.m[structName] = make(map[string]int)
+func (v *visitor) decl(t types.Type, fieldName string) {
+	if _, ok := v.m[t]; !ok {
+		v.m[t] = make(map[string]int)
 	}
-	if _, ok := v.m[structName][fieldName]; !ok {
-		v.m[structName][fieldName] = 0
+	if _, ok := v.m[t][fieldName]; !ok {
+		v.m[t][fieldName] = 0
 	}
 }
 
-func (v *visitor) assignment(structName, fieldName string) {
-	if _, ok := v.m[structName]; !ok {
-		v.m[structName] = make(map[string]int)
+func (v *visitor) assignment(t types.Type, fieldName string) {
+	if _, ok := v.m[t]; !ok {
+		v.m[t] = make(map[string]int)
 	}
-	if _, ok := v.m[structName][fieldName]; ok {
-		v.m[structName][fieldName]++
+	if _, ok := v.m[t][fieldName]; ok {
+		v.m[t][fieldName]++
 	} else {
-		v.m[structName][fieldName] = 1
+		v.m[t][fieldName] = 1
 	}
 }
 
 func (v *visitor) typeSpec(node *ast.TypeSpec) {
 	if strukt, ok := node.Type.(*ast.StructType); ok {
-		structName := node.Name.Name
+		t := v.info.Defs[node.Name].Type()
 		for _, f := range strukt.Fields.List {
 			if len(f.Names) > 0 {
 				fieldName := f.Names[0].Name
-				v.decl(structName, fieldName)
+				v.decl(t, fieldName)
 			}
 		}
 	}
 }
 
-func (v *visitor) names(expr *ast.SelectorExpr) (string, string, bool) {
+func (v *visitor) typeAndFieldName(expr *ast.SelectorExpr) (types.Type, string, bool) {
 	selection := v.info.Selections[expr]
 	if selection == nil {
-		return "", "", false
+		return nil, "", false
 	}
 	recv := selection.Recv()
 	if ptr, ok := recv.(*types.Pointer); ok {
 		recv = ptr.Elem()
 	}
-	return types.TypeString(v.pkg, recv), selection.Obj().Name(), true
+	return recv, selection.Obj().Name(), true
 }
 
 func (v *visitor) assignStmt(node *ast.AssignStmt) {
@@ -80,20 +80,25 @@ func (v *visitor) assignStmt(node *ast.AssignStmt) {
 			}
 		}
 		if selector != nil {
-			if sn, fn, ok := v.names(selector); ok {
-				v.assignment(sn, fn)
+			if t, fn, ok := v.typeAndFieldName(selector); ok {
+				v.assignment(t, fn)
 			}
 		}
 	}
 }
 
 func (v *visitor) compositeLiteral(node *ast.CompositeLit) {
-	t := v.info.Types[node.Type]
+	t := v.info.Types[node.Type].Type
 	for _, expr := range node.Elts {
-		if kv, ok := expr.(*ast.KeyValueExpr); ok { // no support for positional field values yet
+		if kv, ok := expr.(*ast.KeyValueExpr); ok {
 			if ident, ok := kv.Key.(*ast.Ident); ok {
-				v.assignment(types.TypeString(v.pkg, t.Type), ident.Name)
+				v.assignment(t, ident.Name)
 			}
+		} else {
+			// Struct literal with positional values.
+			// All the fields are assigned.
+			v.skip[t] = struct{}{}
+			break
 		}
 	}
 }
@@ -110,8 +115,8 @@ func (v *visitor) Visit(node ast.Node) ast.Visitor {
 
 	case *ast.SelectorExpr:
 		if !*assignmentsOnly {
-			if sn, fn, ok := v.names(node); ok {
-				v.assignment(sn, fn)
+			if t, fn, ok := v.typeAndFieldName(node); ok {
+				v.assignment(t, fn)
 			}
 		}
 
@@ -131,10 +136,12 @@ func main() {
 	visitor := &visitor{
 		info: types.Info{
 			Types:      make(map[ast.Expr]types.TypeAndValue),
+			Defs:       make(map[*ast.Ident]types.Object),
 			Selections: make(map[*ast.SelectorExpr]*types.Selection),
 		},
 
-		m: make(map[string]map[string]int),
+		m:    make(map[types.Type]map[string]int),
+		skip: make(map[types.Type]struct{}),
 	}
 	fset, astFiles := check.ASTFilesForPackage(pkgPath)
 	imp := importer.New()
@@ -148,10 +155,18 @@ func main() {
 		ast.Walk(visitor, f)
 	}
 	exitStatus := 0
-	for structName := range visitor.m {
-		for fieldName, v := range visitor.m[structName] {
-			if v < *minimumUseCount {
-				fmt.Printf("%s.%s\n", structName, fieldName)
+	for t := range visitor.m {
+		if _, skip := visitor.skip[t]; skip {
+			continue
+		}
+		for fieldName, v := range visitor.m[t] {
+			if v == 0 {
+				field, _, _ := types.LookupFieldOrMethod(t, visitor.pkg, fieldName)
+				pos := fset.Position(field.Pos())
+				fmt.Printf("%s:%d: %s.%s\n",
+					pos.Filename, pos.Line,
+					types.TypeString(visitor.pkg, t), fieldName,
+				)
 				exitStatus = 1
 			}
 		}
