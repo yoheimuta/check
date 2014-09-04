@@ -24,7 +24,6 @@ Find unused struct fields.
 $ structcheck --help
 Usage of structcheck:
   -a=false: Count assignments only
-    -n=1: Minimum use count
 
 $ structcheck fmt
 /usr/.../fmt/print.go:110: pp.n
