@@ -18,13 +18,13 @@ import (
 	"flag"
 	"fmt"
 	"go/ast"
-	"log"
 	"os"
 
 	"code.google.com/p/go.tools/go/types"
 	"honnef.co/go/importer"
 
 	"github.com/opennota/check"
+	"github.com/opennota/glob"
 )
 
 var (
@@ -143,45 +143,48 @@ func (v *visitor) Visit(node ast.Node) ast.Visitor {
 
 func main() {
 	flag.Parse()
-	pkgPath := "."
-	if len(flag.Args()) > 0 {
-		pkgPath = flag.Arg(0)
-	}
-	visitor := &visitor{
-		info: types.Info{
-			Types:      make(map[ast.Expr]types.TypeAndValue),
-			Defs:       make(map[*ast.Ident]types.Object),
-			Selections: make(map[*ast.SelectorExpr]*types.Selection),
-		},
-
-		m:    make(map[types.Type]map[string]int),
-		skip: make(map[types.Type]struct{}),
-	}
-	fset, astFiles := check.ASTFilesForPackage(pkgPath)
-	imp := importer.New()
-	config := types.Config{Import: imp.Import}
-	var err error
-	visitor.pkg, err = config.Check(pkgPath, fset, astFiles, &visitor.info)
-	if err != nil {
-		log.Fatal(err)
-	}
-	for _, f := range astFiles {
-		ast.Walk(visitor, f)
-	}
 	exitStatus := 0
-	for t := range visitor.m {
-		if _, skip := visitor.skip[t]; skip {
+	importPaths := glob.ImportPaths(flag.Args())
+	if len(importPaths) == 0 {
+		importPaths = []string{"."}
+	}
+	for _, pkgPath := range importPaths {
+		visitor := &visitor{
+			info: types.Info{
+				Types:      make(map[ast.Expr]types.TypeAndValue),
+				Defs:       make(map[*ast.Ident]types.Object),
+				Selections: make(map[*ast.SelectorExpr]*types.Selection),
+			},
+
+			m:    make(map[types.Type]map[string]int),
+			skip: make(map[types.Type]struct{}),
+		}
+		fset, astFiles := check.ASTFilesForPackage(pkgPath)
+		imp := importer.New()
+		config := types.Config{Import: imp.Import}
+		var err error
+		visitor.pkg, err = config.Check(pkgPath, fset, astFiles, &visitor.info)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s: %v\n", pkgPath, err)
 			continue
 		}
-		for fieldName, v := range visitor.m[t] {
-			if v == 0 {
-				field, _, _ := types.LookupFieldOrMethod(t, visitor.pkg, fieldName)
-				pos := fset.Position(field.Pos())
-				fmt.Printf("%s:%d: %s.%s\n",
-					pos.Filename, pos.Line,
-					types.TypeString(visitor.pkg, t), fieldName,
-				)
-				exitStatus = 1
+		for _, f := range astFiles {
+			ast.Walk(visitor, f)
+		}
+		for t := range visitor.m {
+			if _, skip := visitor.skip[t]; skip {
+				continue
+			}
+			for fieldName, v := range visitor.m[t] {
+				if v == 0 {
+					field, _, _ := types.LookupFieldOrMethod(t, visitor.pkg, fieldName)
+					pos := fset.Position(field.Pos())
+					fmt.Printf("%s:%d: %s.%s\n",
+						pos.Filename, pos.Line,
+						types.TypeString(visitor.pkg, t), fieldName,
+					)
+					exitStatus = 1
+				}
 			}
 		}
 	}

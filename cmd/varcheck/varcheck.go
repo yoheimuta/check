@@ -18,13 +18,13 @@ import (
 	"flag"
 	"fmt"
 	"go/ast"
-	"log"
 	"os"
 
 	"code.google.com/p/go.tools/go/types"
 	"honnef.co/go/importer"
 
 	"github.com/opennota/check"
+	"github.com/opennota/glob"
 )
 
 var (
@@ -85,35 +85,38 @@ func (v *visitor) Visit(node ast.Node) ast.Visitor {
 
 func main() {
 	flag.Parse()
-	pkgPath := "."
-	if len(flag.Args()) > 0 {
-		pkgPath = flag.Arg(0)
-	}
-	visitor := &visitor{
-		info: types.Info{
-			Defs: make(map[*ast.Ident]types.Object),
-			Uses: make(map[*ast.Ident]types.Object),
-		},
-
-		m: make(map[types.Object]int),
-	}
-	fset, astFiles := check.ASTFilesForPackage(pkgPath)
-	imp := importer.New()
-	config := types.Config{Import: imp.Import}
-	var err error
-	visitor.pkg, err = config.Check(pkgPath, fset, astFiles, &visitor.info)
-	if err != nil {
-		log.Fatal(err)
-	}
-	for _, f := range astFiles {
-		ast.Walk(visitor, f)
-	}
 	exitStatus := 0
-	for obj, useCount := range visitor.m {
-		if useCount == 0 && (*reportExported || !ast.IsExported(obj.Name())) {
-			pos := fset.Position(obj.Pos())
-			fmt.Printf("%s:%d: %s\n", pos.Filename, pos.Line, obj.Name())
-			exitStatus = 1
+	importPaths := glob.ImportPaths(flag.Args())
+	if len(importPaths) == 0 {
+		importPaths = []string{"."}
+	}
+	for _, pkgPath := range importPaths {
+		visitor := &visitor{
+			info: types.Info{
+				Defs: make(map[*ast.Ident]types.Object),
+				Uses: make(map[*ast.Ident]types.Object),
+			},
+
+			m: make(map[types.Object]int),
+		}
+		fset, astFiles := check.ASTFilesForPackage(pkgPath)
+		imp := importer.New()
+		config := types.Config{Import: imp.Import}
+		var err error
+		visitor.pkg, err = config.Check(pkgPath, fset, astFiles, &visitor.info)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s: %v\n", pkgPath, err)
+			continue
+		}
+		for _, f := range astFiles {
+			ast.Walk(visitor, f)
+		}
+		for obj, useCount := range visitor.m {
+			if useCount == 0 && (*reportExported || !ast.IsExported(obj.Name())) {
+				pos := fset.Position(obj.Pos())
+				fmt.Printf("%s:%d: %s\n", pos.Filename, pos.Line, obj.Name())
+				exitStatus = 1
+			}
 		}
 	}
 	os.Exit(exitStatus)

@@ -22,6 +22,7 @@ import (
 	"os"
 
 	"github.com/opennota/check"
+	"github.com/opennota/glob"
 )
 
 type visitor struct {
@@ -68,15 +69,18 @@ func (v *visitor) Visit(node ast.Node) ast.Visitor {
 
 func main() {
 	flag.Parse()
-	pkgPath := "."
-	if len(flag.Args()) > 0 {
-		pkgPath = flag.Arg(0)
+	exitStatus = 0
+	importPaths := glob.ImportPaths(flag.Args())
+	if len(importPaths) == 0 {
+		importPaths = []string{"."}
 	}
-	visitor := &visitor{}
-	fset, astFiles := check.ASTFilesForPackage(pkgPath)
-	visitor.fset = fset
-	for _, f := range astFiles {
-		ast.Walk(visitor, f)
+	for _, pkgPath := range importPaths {
+		visitor := &visitor{}
+		fset, astFiles := check.ASTFilesForPackage(pkgPath)
+		visitor.fset = fset
+		for _, f := range astFiles {
+			ast.Walk(visitor, f)
+		}
 	}
 	os.Exit(exitStatus)
 }
