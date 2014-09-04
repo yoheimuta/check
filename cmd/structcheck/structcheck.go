@@ -177,7 +177,7 @@ func main() {
 			}
 			for fieldName, v := range visitor.m[t] {
 				if v == 0 {
-					field, _, _ := types.LookupFieldOrMethod(t, visitor.pkg, fieldName)
+					field, _, _ := types.LookupFieldOrMethod(t, false, visitor.pkg, fieldName)
 					pos := fset.Position(field.Pos())
 					fmt.Printf("%s:%d: %s.%s\n",
 						pos.Filename, pos.Line,
