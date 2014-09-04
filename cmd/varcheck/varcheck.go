@@ -101,6 +101,8 @@ func main() {
 		}
 		fset, astFiles := check.ASTFilesForPackage(pkgPath)
 		imp := importer.New()
+		// Preliminary cgo support.
+		imp.Config = importer.Config{UseGcFallback: true}
 		config := types.Config{Import: imp.Import}
 		var err error
 		visitor.pkg, err = config.Check(pkgPath, fset, astFiles, &visitor.info)
