@@ -23,8 +23,8 @@ import (
 	"code.google.com/p/go.tools/go/types"
 	"honnef.co/go/importer"
 
+	"github.com/kisielk/gotool"
 	"github.com/opennota/check"
-	"github.com/opennota/glob"
 )
 
 var (
@@ -86,7 +86,7 @@ func (v *visitor) Visit(node ast.Node) ast.Visitor {
 func main() {
 	flag.Parse()
 	exitStatus := 0
-	importPaths := glob.ImportPaths(flag.Args())
+	importPaths := gotool.ImportPaths(flag.Args())
 	if len(importPaths) == 0 {
 		importPaths = []string{"."}
 	}

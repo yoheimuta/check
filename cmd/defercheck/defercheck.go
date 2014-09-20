@@ -21,8 +21,8 @@ import (
 	"go/token"
 	"os"
 
+	"github.com/kisielk/gotool"
 	"github.com/opennota/check"
-	"github.com/opennota/glob"
 )
 
 type visitor struct {
@@ -70,7 +70,7 @@ func (v *visitor) Visit(node ast.Node) ast.Visitor {
 func main() {
 	flag.Parse()
 	exitStatus = 0
-	importPaths := glob.ImportPaths(flag.Args())
+	importPaths := gotool.ImportPaths(flag.Args())
 	if len(importPaths) == 0 {
 		importPaths = []string{"."}
 	}
