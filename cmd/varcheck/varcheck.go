@@ -20,7 +20,7 @@ import (
 	"go/ast"
 	"os"
 
-	"code.google.com/p/go.tools/go/types"
+	"golang.org/x/tools/go/types"
 	"honnef.co/go/importer"
 
 	"github.com/kisielk/gotool"
