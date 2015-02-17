@@ -29,6 +29,7 @@ import (
 
 var (
 	assignmentsOnly = flag.Bool("a", false, "Count assignments only")
+	loadTestFiles   = flag.Bool("t", false, "Load test files too")
 )
 
 type visitor struct {
@@ -159,7 +160,7 @@ func main() {
 			m:    make(map[types.Type]map[string]int),
 			skip: make(map[types.Type]struct{}),
 		}
-		fset, astFiles := check.ASTFilesForPackage(pkgPath)
+		fset, astFiles := check.ASTFilesForPackage(pkgPath, *loadTestFiles)
 		imp := importer.New()
 		// Preliminary cgo support.
 		imp.Config = importer.Config{UseGcFallback: true}

@@ -23,7 +23,7 @@ import (
 	"reflect"
 )
 
-func ASTFilesForPackage(path string) (*token.FileSet, []*ast.File) {
+func ASTFilesForPackage(path string, includeTestFiles bool) (*token.FileSet, []*ast.File) {
 	ctx := build.Default
 	pkg, err := ctx.Import(path, ".", 0)
 	if err != nil {
@@ -39,7 +39,12 @@ func ASTFilesForPackage(path string) (*token.FileSet, []*ast.File) {
 	}
 	fset := token.NewFileSet()
 	var astFiles []*ast.File
-	for _, f := range pkg.GoFiles {
+	files := pkg.GoFiles
+	if includeTestFiles {
+		files = append(files, pkg.TestGoFiles...)
+		files = append(files, pkg.XTestGoFiles...)
+	}
+	for _, f := range files {
 		fn := filepath.Join(pkg.Dir, f)
 		f, err := parser.ParseFile(fset, fn, nil, 0)
 		if err != nil {

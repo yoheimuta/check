@@ -99,7 +99,7 @@ func main() {
 
 			m: make(map[types.Object]int),
 		}
-		fset, astFiles := check.ASTFilesForPackage(pkgPath)
+		fset, astFiles := check.ASTFilesForPackage(pkgPath, false)
 		imp := importer.New()
 		// Preliminary cgo support.
 		imp.Config = importer.Config{UseGcFallback: true}

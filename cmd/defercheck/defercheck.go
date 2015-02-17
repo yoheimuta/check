@@ -76,7 +76,7 @@ func main() {
 	}
 	for _, pkgPath := range importPaths {
 		visitor := &visitor{}
-		fset, astFiles := check.ASTFilesForPackage(pkgPath)
+		fset, astFiles := check.ASTFilesForPackage(pkgPath, false)
 		visitor.fset = fset
 		for _, f := range astFiles {
 			ast.Walk(visitor, f)
