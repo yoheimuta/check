@@ -29,6 +29,7 @@ type visitor struct {
 	fset     *token.FileSet
 	m        map[*ast.Object][]string
 	funcName string
+	pkgPath  string
 }
 
 var exitStatus int
@@ -49,8 +50,8 @@ func (v *visitor) Visit(node ast.Node) ast.Visitor {
 					for _, selname := range selectors {
 						if selname == sel.Sel.Name {
 							pos := v.fset.Position(node.Pos())
-							fmt.Printf("%s:%d: Repeating defer %s.%s() inside function %s\n",
-								pos.Filename, pos.Line,
+							fmt.Printf("%s: %s:%d:%d: Repeating defer %s.%s() inside function %s\n",
+								v.pkgPath, pos.Filename, pos.Line, pos.Column,
 								ident.Name, selname, v.funcName)
 							found = true
 							exitStatus = 1
@@ -75,7 +76,7 @@ func main() {
 		importPaths = []string{"."}
 	}
 	for _, pkgPath := range importPaths {
-		visitor := &visitor{}
+		visitor := &visitor{pkgPath: pkgPath}
 		fset, astFiles := check.ASTFilesForPackage(pkgPath, false)
 		visitor.fset = fset
 		for _, f := range astFiles {

@@ -187,8 +187,8 @@ func main() {
 						}
 					}
 					pos := fset.Position(field.Pos())
-					fmt.Printf("%s:%d: %s.%s\n",
-						pos.Filename, pos.Line,
+					fmt.Printf("%s: %s:%d:%d: %s.%s\n",
+						pkgPath, pos.Filename, pos.Line, pos.Column,
 						types.TypeString(visitor.pkg, t), fieldName,
 					)
 					exitStatus = 1
