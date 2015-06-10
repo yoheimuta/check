@@ -20,10 +20,10 @@ import (
 	"go/ast"
 	"os"
 
+	"github.com/kisielk/gotool"
 	"golang.org/x/tools/go/types"
 	"honnef.co/go/importer"
 
-	"github.com/kisielk/gotool"
 	"github.com/opennota/check"
 )
 

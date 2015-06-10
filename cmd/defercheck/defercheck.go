@@ -22,6 +22,7 @@ import (
 	"os"
 
 	"github.com/kisielk/gotool"
+
 	"github.com/opennota/check"
 )
 
