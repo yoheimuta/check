@@ -9,6 +9,9 @@ go:
 
 install:
   - go get github.com/opennota/check
+  - go get github.com/kisielk/gotool
+  - go get golang.org/x/tools/go/types
+  - go get honnef.co/go/importer
   - go build .
   - go build ./cmd/defercheck
   - go build ./cmd/structcheck
