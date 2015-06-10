@@ -10,6 +10,9 @@ go:
 install:
   - go get github.com/opennota/check
   - go build .
+  - go build ./cmd/defercheck
+  - go build ./cmd/structcheck
+  - go build ./cmd/varcheck
 
 script:
   - go test -v
