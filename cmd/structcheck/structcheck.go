@@ -181,6 +181,11 @@ func main() {
 			for fieldName, v := range visitor.m[t] {
 				if v == 0 {
 					field, _, _ := types.LookupFieldOrMethod(t, false, visitor.pkg, fieldName)
+					if fieldName == "XMLName" {
+						if named, ok := field.Type().(*types.Named); ok && named.Obj().Pkg().Path() == "encoding/xml" {
+							continue
+						}
+					}
 					pos := fset.Position(field.Pos())
 					fmt.Printf("%s:%d: %s.%s\n",
 						pos.Filename, pos.Line,
