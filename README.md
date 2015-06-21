@@ -55,8 +55,3 @@ $ varcheck image/jpeg
 ## Known limitations
 
 structcheck doesn't handle embedded structs yet.
-
-## License
-
-GNU GPL v3+
-
