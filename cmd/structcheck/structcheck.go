@@ -30,6 +30,7 @@ import (
 var (
 	assignmentsOnly = flag.Bool("a", false, "Count assignments only")
 	loadTestFiles   = flag.Bool("t", false, "Load test files too")
+	reportExported  = flag.Bool("e", false, "Report exported fields")
 )
 
 type visitor struct {
@@ -179,6 +180,9 @@ func main() {
 				continue
 			}
 			for fieldName, v := range visitor.m[t] {
+				if !*reportExported && ast.IsExported(fieldName) {
+					continue
+				}
 				if v == 0 {
 					field, _, _ := types.LookupFieldOrMethod(t, false, visitor.pkg, fieldName)
 					if fieldName == "XMLName" {
