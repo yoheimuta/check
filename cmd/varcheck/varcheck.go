@@ -83,7 +83,7 @@ func (v *visitor) use(obj types.Object) {
 }
 
 func isReserved(name string) bool {
-	return name == "_" || strings.HasPrefix(name, "_cgo_")
+	return name == "_" || strings.HasPrefix(strings.ToLower(name), "_cgo_")
 }
 
 func (v *visitor) Visit(node ast.Node) ast.Visitor {
