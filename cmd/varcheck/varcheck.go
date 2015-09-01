@@ -20,6 +20,7 @@ import (
 	"go/build"
 	"log"
 	"os"
+	"sort"
 
 	"github.com/kisielk/gotool"
 	"golang.org/x/tools/go/loader"
@@ -125,12 +126,20 @@ func main() {
 		}
 	}
 
+	var lines []string
+
 	for obj, useCount := range uses {
 		if useCount == 0 && (*reportExported || !ast.IsExported(obj.Name())) {
 			pos := program.Fset.Position(obj.Pos())
-			fmt.Printf("%s: %s:%d:%d: %s\n", obj.Pkg().Path(), pos.Filename, pos.Line, pos.Column, obj.Name())
+			lines = append(lines, fmt.Sprintf("%s: %s:%d:%d: %s", obj.Pkg().Path(), pos.Filename, pos.Line, pos.Column, obj.Name()))
 			exitStatus = 1
 		}
 	}
+
+	sort.Strings(lines)
+	for _, line := range lines {
+		fmt.Println(line)
+	}
+
 	os.Exit(exitStatus)
 }
