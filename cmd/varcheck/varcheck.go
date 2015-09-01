@@ -1,4 +1,3 @@
-// varcheck
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
@@ -18,13 +17,14 @@ import (
 	"flag"
 	"fmt"
 	"go/ast"
+	"go/build"
+	"go/token"
+	"log"
 	"os"
 
 	"github.com/kisielk/gotool"
+	"golang.org/x/tools/go/loader"
 	"golang.org/x/tools/go/types"
-	"honnef.co/go/importer"
-
-	"github.com/opennota/check"
 )
 
 var (
@@ -32,36 +32,40 @@ var (
 )
 
 type visitor struct {
-	pkg        *types.Package
-	info       types.Info
-	m          map[types.Object]int
+	prog       *loader.Program
+	pkg        *loader.PackageInfo
+	uses       map[types.Object]int
+	positions  map[types.Object]token.Position
 	insideFunc bool
 }
 
 func (v *visitor) decl(obj types.Object) {
-	if _, ok := v.m[obj]; !ok {
-		v.m[obj] = 0
+	if _, ok := v.uses[obj]; !ok {
+		v.uses[obj] = 0
+	}
+	if _, ok := v.positions[obj]; !ok {
+		v.positions[obj] = v.prog.Fset.Position(obj.Pos())
 	}
 }
 
 func (v *visitor) use(obj types.Object) {
-	if _, ok := v.m[obj]; ok {
-		v.m[obj]++
+	if _, ok := v.uses[obj]; ok {
+		v.uses[obj]++
 	} else {
-		v.m[obj] = 1
+		v.uses[obj] = 1
 	}
 }
 
 func (v *visitor) Visit(node ast.Node) ast.Visitor {
 	switch node := node.(type) {
 	case *ast.Ident:
-		v.use(v.info.Uses[node])
+		v.use(v.pkg.Info.Uses[node])
 
 	case *ast.ValueSpec:
 		if !v.insideFunc {
 			for _, ident := range node.Names {
 				if ident.Name != "_" {
-					v.decl(v.info.Defs[ident])
+					v.decl(v.pkg.Info.Defs[ident])
 				}
 			}
 		}
@@ -90,35 +94,49 @@ func main() {
 	if len(importPaths) == 0 {
 		importPaths = []string{"."}
 	}
-	for _, pkgPath := range importPaths {
-		visitor := &visitor{
-			info: types.Info{
-				Defs: make(map[*ast.Ident]types.Object),
-				Uses: make(map[*ast.Ident]types.Object),
-			},
 
-			m: make(map[types.Object]int),
-		}
-		fset, astFiles := check.ASTFilesForPackage(pkgPath, false)
-		imp := importer.New()
-		// Preliminary cgo support.
-		imp.Config = importer.Config{UseGcFallback: true}
-		config := types.Config{Import: imp.Import}
-		var err error
-		visitor.pkg, err = config.Check(pkgPath, fset, astFiles, &visitor.info)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s: %v\n", pkgPath, err)
+	ctx := build.Default
+	loadcfg := loader.Config{
+		Build: &ctx,
+	}
+	rest, err := loadcfg.FromArgs(importPaths, true)
+	if err != nil {
+		log.Fatalf("could not parse arguments: %s", err)
+	}
+	if len(rest) > 0 {
+		log.Fatalf("unhandled extra arguments: %v", rest)
+	}
+
+	program, err := loadcfg.Load()
+	if err != nil {
+		log.Fatalf("could not type check: %s", err)
+	}
+
+	uses := make(map[types.Object]int)
+	positions := make(map[types.Object]token.Position)
+
+	for _, pkgInfo := range program.InitialPackages() {
+		if pkgInfo.Pkg.Path() == "unsafe" {
 			continue
 		}
-		for _, f := range astFiles {
-			ast.Walk(visitor, f)
+
+		v := &visitor{
+			prog:      program,
+			pkg:       pkgInfo,
+			uses:      uses,
+			positions: positions,
 		}
-		for obj, useCount := range visitor.m {
-			if useCount == 0 && (*reportExported || !ast.IsExported(obj.Name())) {
-				pos := fset.Position(obj.Pos())
-				fmt.Printf("%s: %s:%d:%d: %s\n", pkgPath, pos.Filename, pos.Line, pos.Column, obj.Name())
-				exitStatus = 1
-			}
+
+		for _, f := range v.pkg.Files {
+			ast.Walk(v, f)
+		}
+	}
+
+	for obj, useCount := range uses {
+		if useCount == 0 && (*reportExported || !ast.IsExported(obj.Name())) {
+			pos := positions[obj]
+			fmt.Printf("%s: %s:%d:%d: %s\n", obj.Pkg().Path(), pos.Filename, pos.Line, pos.Column, obj.Name())
+			exitStatus = 1
 		}
 	}
 	os.Exit(exitStatus)
