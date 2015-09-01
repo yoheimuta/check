@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/build"
+	"go/token"
 	"log"
 	"os"
 	"sort"
@@ -31,24 +32,52 @@ var (
 	reportExported = flag.Bool("e", false, "Report exported variables and constants")
 )
 
+type object struct {
+	pkgPath string
+	name    string
+}
+
 type visitor struct {
 	prog       *loader.Program
 	pkg        *loader.PackageInfo
-	uses       map[types.Object]int
+	uses       map[object]int
+	positions  map[object]token.Position
 	insideFunc bool
 }
 
+func getKey(obj types.Object) object {
+	if obj == nil {
+		return object{}
+	}
+
+	pkg := obj.Pkg()
+	pkgPath := ""
+	if pkg != nil {
+		pkgPath = pkg.Path()
+	}
+
+	return object{
+		pkgPath: pkgPath,
+		name:    obj.Name(),
+	}
+}
+
 func (v *visitor) decl(obj types.Object) {
-	if _, ok := v.uses[obj]; !ok {
-		v.uses[obj] = 0
+	key := getKey(obj)
+	if _, ok := v.uses[key]; !ok {
+		v.uses[key] = 0
+	}
+	if _, ok := v.positions[key]; !ok {
+		v.positions[key] = v.prog.Fset.Position(obj.Pos())
 	}
 }
 
 func (v *visitor) use(obj types.Object) {
-	if _, ok := v.uses[obj]; ok {
-		v.uses[obj]++
+	key := getKey(obj)
+	if _, ok := v.uses[key]; ok {
+		v.uses[key]++
 	} else {
-		v.uses[obj] = 1
+		v.uses[key] = 1
 	}
 }
 
@@ -108,7 +137,8 @@ func main() {
 		log.Fatalf("could not type check: %s", err)
 	}
 
-	uses := make(map[types.Object]int)
+	uses := make(map[object]int)
+	positions := make(map[object]token.Position)
 
 	for _, pkgInfo := range program.InitialPackages() {
 		if pkgInfo.Pkg.Path() == "unsafe" {
@@ -116,9 +146,10 @@ func main() {
 		}
 
 		v := &visitor{
-			prog: program,
-			pkg:  pkgInfo,
-			uses: uses,
+			prog:      program,
+			pkg:       pkgInfo,
+			uses:      uses,
+			positions: positions,
 		}
 
 		for _, f := range v.pkg.Files {
@@ -129,9 +160,9 @@ func main() {
 	var lines []string
 
 	for obj, useCount := range uses {
-		if useCount == 0 && (*reportExported || !ast.IsExported(obj.Name())) {
-			pos := program.Fset.Position(obj.Pos())
-			lines = append(lines, fmt.Sprintf("%s: %s:%d:%d: %s", obj.Pkg().Path(), pos.Filename, pos.Line, pos.Column, obj.Name()))
+		if useCount == 0 && (*reportExported || !ast.IsExported(obj.name)) {
+			pos := positions[obj]
+			lines = append(lines, fmt.Sprintf("%s: %s:%d:%d: %s", obj.pkgPath, pos.Filename, pos.Line, pos.Column, obj.name))
 			exitStatus = 1
 		}
 	}
