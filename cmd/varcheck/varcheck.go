@@ -22,6 +22,7 @@ import (
 	"log"
 	"os"
 	"sort"
+	"strings"
 
 	"github.com/kisielk/gotool"
 	"golang.org/x/tools/go/loader"
@@ -81,6 +82,10 @@ func (v *visitor) use(obj types.Object) {
 	}
 }
 
+func isReserved(name string) bool {
+	return name == "_" || strings.HasPrefix(name, "_cgo_")
+}
+
 func (v *visitor) Visit(node ast.Node) ast.Visitor {
 	switch node := node.(type) {
 	case *ast.Ident:
@@ -89,7 +94,7 @@ func (v *visitor) Visit(node ast.Node) ast.Visitor {
 	case *ast.ValueSpec:
 		if !v.insideFunc {
 			for _, ident := range node.Names {
-				if ident.Name != "_" {
+				if !isReserved(ident.Name) {
 					v.decl(v.pkg.Info.Defs[ident])
 				}
 			}
