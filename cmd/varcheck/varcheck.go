@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"go/ast"
 	"go/build"
-	"go/token"
 	"log"
 	"os"
 
@@ -35,16 +34,12 @@ type visitor struct {
 	prog       *loader.Program
 	pkg        *loader.PackageInfo
 	uses       map[types.Object]int
-	positions  map[types.Object]token.Position
 	insideFunc bool
 }
 
 func (v *visitor) decl(obj types.Object) {
 	if _, ok := v.uses[obj]; !ok {
 		v.uses[obj] = 0
-	}
-	if _, ok := v.positions[obj]; !ok {
-		v.positions[obj] = v.prog.Fset.Position(obj.Pos())
 	}
 }
 
@@ -113,7 +108,6 @@ func main() {
 	}
 
 	uses := make(map[types.Object]int)
-	positions := make(map[types.Object]token.Position)
 
 	for _, pkgInfo := range program.InitialPackages() {
 		if pkgInfo.Pkg.Path() == "unsafe" {
@@ -121,10 +115,9 @@ func main() {
 		}
 
 		v := &visitor{
-			prog:      program,
-			pkg:       pkgInfo,
-			uses:      uses,
-			positions: positions,
+			prog: program,
+			pkg:  pkgInfo,
+			uses: uses,
 		}
 
 		for _, f := range v.pkg.Files {
@@ -134,7 +127,7 @@ func main() {
 
 	for obj, useCount := range uses {
 		if useCount == 0 && (*reportExported || !ast.IsExported(obj.Name())) {
-			pos := positions[obj]
+			pos := program.Fset.Position(obj.Pos())
 			fmt.Printf("%s: %s:%d:%d: %s\n", obj.Pkg().Path(), pos.Filename, pos.Line, pos.Column, obj.Name())
 			exitStatus = 1
 		}
