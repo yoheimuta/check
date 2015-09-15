@@ -18,13 +18,12 @@ import (
 	"flag"
 	"fmt"
 	"go/ast"
+	"go/build"
 	"os"
 
 	"github.com/kisielk/gotool"
+	"golang.org/x/tools/go/loader"
 	"golang.org/x/tools/go/types"
-	"honnef.co/go/importer"
-
-	"github.com/opennota/check"
 )
 
 var (
@@ -34,8 +33,8 @@ var (
 )
 
 type visitor struct {
-	pkg  *types.Package
-	info types.Info
+	prog *loader.Program
+	pkg  *loader.PackageInfo
 	m    map[types.Type]map[string]int
 	skip map[types.Type]struct{}
 }
@@ -62,7 +61,7 @@ func (v *visitor) assignment(t types.Type, fieldName string) {
 
 func (v *visitor) typeSpec(node *ast.TypeSpec) {
 	if strukt, ok := node.Type.(*ast.StructType); ok {
-		t := v.info.Defs[node.Name].Type()
+		t := v.pkg.Info.Defs[node.Name].Type()
 		for _, f := range strukt.Fields.List {
 			if len(f.Names) > 0 {
 				fieldName := f.Names[0].Name
@@ -73,7 +72,7 @@ func (v *visitor) typeSpec(node *ast.TypeSpec) {
 }
 
 func (v *visitor) typeAndFieldName(expr *ast.SelectorExpr) (types.Type, string, bool) {
-	selection := v.info.Selections[expr]
+	selection := v.pkg.Info.Selections[expr]
 	if selection == nil {
 		return nil, "", false
 	}
@@ -104,7 +103,7 @@ func (v *visitor) assignStmt(node *ast.AssignStmt) {
 }
 
 func (v *visitor) compositeLiteral(node *ast.CompositeLit) {
-	t := v.info.Types[node.Type].Type
+	t := v.pkg.Info.Types[node.Type].Type
 	for _, expr := range node.Elts {
 		if kv, ok := expr.(*ast.KeyValueExpr); ok {
 			if ident, ok := kv.Key.(*ast.Ident); ok {
@@ -150,31 +149,38 @@ func main() {
 	if len(importPaths) == 0 {
 		importPaths = []string{"."}
 	}
+	ctx := build.Default
 	for _, pkgPath := range importPaths {
 		visitor := &visitor{
-			info: types.Info{
-				Types:      make(map[ast.Expr]types.TypeAndValue),
-				Defs:       make(map[*ast.Ident]types.Object),
-				Selections: make(map[*ast.SelectorExpr]*types.Selection),
-			},
-
 			m:    make(map[types.Type]map[string]int),
 			skip: make(map[types.Type]struct{}),
 		}
-		fset, astFiles := check.ASTFilesForPackage(pkgPath, *loadTestFiles)
-		imp := importer.New()
-		// Preliminary cgo support.
-		imp.Config = importer.Config{UseGcFallback: true}
-		config := types.Config{Import: imp.Import}
-		var err error
-		visitor.pkg, err = config.Check(pkgPath, fset, astFiles, &visitor.info)
+		loadcfg := loader.Config{
+			Build: &ctx,
+		}
+		rest, err := loadcfg.FromArgs([]string{pkgPath}, *loadTestFiles)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s: %v\n", pkgPath, err)
+			fmt.Fprintf(os.Stderr, "could not parse arguments: %s", err)
 			continue
 		}
-		for _, f := range astFiles {
+		if len(rest) > 0 {
+			fmt.Fprintf(os.Stderr, "unhandled extra arguments: %v", rest)
+			continue
+		}
+
+		program, err := loadcfg.Load()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "could not type check: %s", err)
+			continue
+		}
+
+		pkg := program.InitialPackages()[0]
+		visitor.prog = program
+		visitor.pkg = pkg
+		for _, f := range pkg.Files {
 			ast.Walk(visitor, f)
 		}
+
 		for t := range visitor.m {
 			if _, skip := visitor.skip[t]; skip {
 				continue
@@ -184,13 +190,13 @@ func main() {
 					continue
 				}
 				if v == 0 {
-					field, _, _ := types.LookupFieldOrMethod(t, false, visitor.pkg, fieldName)
+					field, _, _ := types.LookupFieldOrMethod(t, false, pkg.Pkg, fieldName)
 					if fieldName == "XMLName" {
 						if named, ok := field.Type().(*types.Named); ok && named.Obj().Pkg().Path() == "encoding/xml" {
 							continue
 						}
 					}
-					pos := fset.Position(field.Pos())
+					pos := program.Fset.Position(field.Pos())
 					fmt.Printf("%s: %s:%d:%d: %s.%s\n",
 						pkgPath, pos.Filename, pos.Line, pos.Column,
 						types.TypeString(t, nil), fieldName,
