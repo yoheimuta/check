@@ -24,6 +24,8 @@ net/http: /usr/lib/go/src/net/http/transport.go:49:6: struct Transport could hav
 net/http: /usr/lib/go/src/net/http/transport.go:811:6: struct persistConn could have size 160 (currently 176)
 
 ```
+For the visualisation of struct packing see http://golang-sizeof.tips/
+
 
 Find repeating `defer`s.
 
