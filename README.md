@@ -6,7 +6,6 @@ A set of utilities for checking Go sources.
 ## Installation
 
     $ go get github.com/opennota/check/cmd/aligncheck
-    $ go get github.com/opennota/check/cmd/defercheck
     $ go get github.com/opennota/check/cmd/structcheck
     $ go get github.com/opennota/check/cmd/varcheck
 
@@ -25,14 +24,6 @@ net/http: /usr/lib/go/src/net/http/transport.go:811:6: struct persistConn could 
 
 ```
 For the visualisation of struct packing see http://golang-sizeof.tips/
-
-
-Find repeating `defer`s.
-
-```
-$ defercheck go/parser
-go/parser: /usr/lib/go/src/go/parser/parser.go:1957:5: Repeating defer p.closeScope() inside function parseSwitchStmt
-```
 
 Find unused struct fields.
 
