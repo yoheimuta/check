@@ -26,7 +26,7 @@ import (
 
 	"github.com/kisielk/gotool"
 	"golang.org/x/tools/go/loader"
-	"golang.org/x/tools/go/types"
+	"go/types"
 )
 
 var (
