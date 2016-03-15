@@ -21,9 +21,10 @@ import (
 	"go/build"
 	"os"
 
+	"go/types"
+
 	"github.com/kisielk/gotool"
 	"golang.org/x/tools/go/loader"
-	"go/types"
 )
 
 var (
@@ -150,33 +151,32 @@ func main() {
 		importPaths = []string{"."}
 	}
 	ctx := build.Default
-	for _, pkgPath := range importPaths {
+	loadcfg := loader.Config{
+		Build: &ctx,
+	}
+	rest, err := loadcfg.FromArgs(importPaths, *loadTestFiles)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "could not parse arguments: %s", err)
+		os.Exit(1)
+	}
+	if len(rest) > 0 {
+		fmt.Fprintf(os.Stderr, "unhandled extra arguments: %v", rest)
+		os.Exit(1)
+	}
+
+	program, err := loadcfg.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "could not type check: %s", err)
+		os.Exit(1)
+	}
+
+	for _, pkg := range program.InitialPackages() {
 		visitor := &visitor{
 			m:    make(map[types.Type]map[string]int),
 			skip: make(map[types.Type]struct{}),
+			prog: program,
+			pkg:  pkg,
 		}
-		loadcfg := loader.Config{
-			Build: &ctx,
-		}
-		rest, err := loadcfg.FromArgs([]string{pkgPath}, *loadTestFiles)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "could not parse arguments: %s", err)
-			continue
-		}
-		if len(rest) > 0 {
-			fmt.Fprintf(os.Stderr, "unhandled extra arguments: %v", rest)
-			continue
-		}
-
-		program, err := loadcfg.Load()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "could not type check: %s", err)
-			continue
-		}
-
-		pkg := program.InitialPackages()[0]
-		visitor.prog = program
-		visitor.pkg = pkg
 		for _, f := range pkg.Files {
 			ast.Walk(visitor, f)
 		}
@@ -198,7 +198,7 @@ func main() {
 					}
 					pos := program.Fset.Position(field.Pos())
 					fmt.Printf("%s: %s:%d:%d: %s.%s\n",
-						pkgPath, pos.Filename, pos.Line, pos.Column,
+						pkg.Pkg.Path(), pos.Filename, pos.Line, pos.Column,
 						types.TypeString(t, nil), fieldName,
 					)
 					exitStatus = 1
