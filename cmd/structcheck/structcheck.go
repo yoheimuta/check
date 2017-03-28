@@ -19,9 +19,9 @@ import (
 	"fmt"
 	"go/ast"
 	"go/build"
-	"os"
-
 	"go/types"
+	"os"
+	"strings"
 
 	"github.com/kisielk/gotool"
 	"golang.org/x/tools/go/loader"
@@ -31,6 +31,7 @@ var (
 	assignmentsOnly = flag.Bool("a", false, "Count assignments only")
 	loadTestFiles   = flag.Bool("t", false, "Load test files too")
 	reportExported  = flag.Bool("e", false, "Report exported fields")
+	buildTags       = flag.String("tags", "", "Build tags")
 )
 
 type visitor struct {
@@ -151,6 +152,9 @@ func main() {
 		importPaths = []string{"."}
 	}
 	ctx := build.Default
+	if *buildTags != "" {
+		ctx.BuildTags = strings.Split(*buildTags, ",")
+	}
 	loadcfg := loader.Config{
 		Build: &ctx,
 	}
