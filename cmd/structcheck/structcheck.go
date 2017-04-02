@@ -195,6 +195,11 @@ func main() {
 				}
 				if v == 0 {
 					field, _, _ := types.LookupFieldOrMethod(t, false, pkg.Pkg, fieldName)
+					if field == nil {
+						fmt.Printf("%s: unknown field or method: %s.%s\n", pkg.Pkg.Path(), t, fieldName)
+						exitStatus = 1
+						continue
+					}
 					if fieldName == "XMLName" {
 						if named, ok := field.Type().(*types.Named); ok && named.Obj().Pkg().Path() == "encoding/xml" {
 							continue
